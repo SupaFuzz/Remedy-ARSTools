@@ -1930,6 +1930,9 @@ sub QueryNew {
 		}
 	}
 
+	## 1/27/2020 -- default getAttachments is false
+	if (! ($p{'getAttachments'} == 1)){ $p{'getAttachments'} = 0; }
+
 	#we need to make sure we 'know' the schema
 	exists($self->{'ARSConfig'}->{$p{'Schema'}}) || do {
 
@@ -2073,22 +2076,6 @@ sub QueryNew {
 			return (undef);
 		};
 
-		## handle attachments
-		## 1/24/2020 -- this is not probably the best place for it
-		## but we've gotta get attachments in here
-		foreach my $field_name (keys (%values)){
-			if ($self->{'ARSConfig'}->{$p{'Schema'}}->{'fields'}->{$field_name}->{'dataType'} eq "attach"){
-				my $a = ARS::ars_GetEntryBLOB($self->{'ctrl'}, $p{'Schema'}, $t, $self->{'ARSConfig'}->{$p{'Schema'}}->{'fields'}->{$field_name}->{'id'}, ARS::AR_LOC_BUFFER) || do {
-					$self->{'errstr'} = "QueryNew: failed to retrieve attachment content (" . $p{'Schema'} . "[" . $t . "]/" . $field_name . "): " . $ARS::ars_errstr;
-					warn($self->{'errstr'}) if $self->{'Debug'};
-					return (undef);
-				};
-				$values{$field_name}->{'value'} = $a;
-				$values{$field_name}->{'size'} = length($a);
-			}
-		}
-
-
 		my $converted_row_data = $self->ConvertFieldsToHumanReadable(
 			Schema					=> $p{'Schema'},
 			Fields					=> \%values,
@@ -2098,6 +2085,28 @@ sub QueryNew {
 			warn($self->{'errstr'}) if $self->{'Debug'};
 			return (undef);
 		};
+
+		## handle attachments
+		## 1/24/2020 -- this is not probably the best place for it
+		if ($p{'getAttachments'} == 1){
+			foreach my $field_name (keys (%{$converted_row_data})){
+				if ($self->{'ARSConfig'}->{$p{'Schema'}}->{'fields'}->{$field_name}->{'dataType'} eq "attach"){
+					my $a = ARS::ars_GetEntryBLOB(
+						$self->{'ctrl'},
+						$p{'Schema'},
+						$t,
+						$self->{'ARSConfig'}->{$p{'Schema'}}->{'fields'}->{$field_name}->{'id'},
+						ARS::AR_LOC_BUFFER
+					) || do {
+						$self->{'errstr'} = "QueryNew: failed to retrieve attachment content (" . $p{'Schema'} . "[" . $t . "]/" . $field_name . "): " . $ARS::ars_errstr;
+						warn($self->{'errstr'}) if $self->{'Debug'};
+						return (undef);
+					};
+					$converted_row_data->{$field_name}->{'buffer'} = $a;
+					$converted_row_data->{$field_name}->{'size'} = length($a);
+				}
+			}
+		}
 
 		#push it on list of results
 		push (@out, $converted_row_data);
