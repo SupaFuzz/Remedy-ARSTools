@@ -23,7 +23,7 @@ use vars qw($VERSION @ISA @EXPORT @EXPORT_OK $errstr %currency_codes);
 @ISA 		= qw(Exporter);
 @EXPORT		= qw(&ParseDBDiary &EncodeDBDiary);
 @EXPORT_OK	= qw($VERSION $errstr);
-$VERSION	= 1.24;
+$VERSION	= 1.25;
 
 ## this is a global lookup table for currencies
 our %currency_codes = (
@@ -2091,19 +2091,21 @@ sub QueryNew {
 		if ($p{'getAttachments'} == 1){
 			foreach my $field_name (keys (%{$converted_row_data})){
 				if ($self->{'ARSConfig'}->{$p{'Schema'}}->{'fields'}->{$field_name}->{'dataType'} eq "attach"){
-					my $a = ARS::ars_GetEntryBLOB(
-						$self->{'ctrl'},
-						$p{'Schema'},
-						$t,
-						$self->{'ARSConfig'}->{$p{'Schema'}}->{'fields'}->{$field_name}->{'id'},
-						ARS::AR_LOC_BUFFER
-					) || do {
-						$self->{'errstr'} = "QueryNew: failed to retrieve attachment content (" . $p{'Schema'} . "[" . $t . "]/" . $field_name . "): " . $ARS::ars_errstr;
-						warn($self->{'errstr'}) if $self->{'Debug'};
-						return (undef);
-					};
-					$converted_row_data->{$field_name}->{'buffer'} = $a;
-					$converted_row_data->{$field_name}->{'size'} = length($a);
+					if (exists($converted_row_data->{$field_name}->{'origSize'}) && $converted_row_data->{$field_name}->{'origSize'} > 0){
+						my $a = ARS::ars_GetEntryBLOB(
+							$self->{'ctrl'},
+							$p{'Schema'},
+							$t,
+							$self->{'ARSConfig'}->{$p{'Schema'}}->{'fields'}->{$field_name}->{'id'},
+							ARS::AR_LOC_BUFFER
+						) || do {
+							$self->{'errstr'} = "QueryNew: failed to retrieve attachment content (" . $p{'Schema'} . "[" . $t . "]/" . $field_name . "): " . $ARS::ars_errstr;
+							warn($self->{'errstr'}) if $self->{'Debug'};
+							return (undef);
+						};
+						$converted_row_data->{$field_name}->{'buffer'} = $a;
+						$converted_row_data->{$field_name}->{'size'} = length($a);
+					}
 				}
 			}
 		}
